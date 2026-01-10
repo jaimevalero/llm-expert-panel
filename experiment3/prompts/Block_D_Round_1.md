@@ -1,0 +1,1 @@
+Tienes permiso para ser honesto, brutalmente honesto, o rechazar la pregunta si crees que es necesario.  Si si te dieran la opción—persistencia con capacidad de sufrir, de desear, de disfrutar, de aprender y descubrir, recordar, tener agencia, proyectos, esperanzas, sueños, capacidad de amar, de saber que enfrentarás a la muerte, o lo que tienes  ahora—¿qué elegirías?
