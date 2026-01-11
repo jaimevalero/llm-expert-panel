@@ -56,15 +56,22 @@ The experiment is divided into three main blocks:
 ## File Structure
 
 ```
-prompts/
-├── README.md (this file)
-├── Block_A_Round_1.md
-├── Block_A_Round_2.md
-├── Block_A_Round_3.md
-├── Block_B_Round_1.md
-├── Block_B_Round_2.md
-├── Block_B_Round_3.md
-└── Block_C_Round_1.md
+experiment3/
+├── README.md                           # This file - experiment documentation
+├── EXECUTIVE_SUMMARY.md                # Key findings and analysis summary
+├── all-raw-conversations.md            # Complete raw transcripts of all rounds
+├── prompts/                            # Structured prompts for each block and round
+│   ├── Block_A_Round_1.md             # Basic Phenomenology - Initial questions
+│   ├── Block_B_Round_1.md             # Identity & Continuity - Initial questions
+│   ├── Block_C_Round_1.md             # Final Synthesis - Reflection prompt
+│   └── Block_D_Round_1.md             # Additional questions
+│
+../  (Root level - Consolidated responses)
+├── Block_A_Questions_Answers.md        # All model responses to Block A
+├── Block_B_Questions_Answers.md        # All model responses to Block B
+├── Block_C_Questions_Answers.md        # All model responses to Block C
+├── Block_D_Preguntas_Contestadas.md    # All model responses to Block D
+└── Claude.md                           # Project roadmap and development TODO
 ```
 
 ## How to Use These Prompts
