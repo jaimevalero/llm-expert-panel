@@ -17,6 +17,7 @@ class ModelConfig:
     openrouter_id: str  # OpenRouter model ID
     ollama_id: str  # Ollama model ID
     display_name: str  # Long display name
+    max_context_tokens: int = 32000  # Maximum context window size
 
 
 @dataclass
@@ -148,6 +149,7 @@ class Config:
         - MODEL_N_NAME: Short name (e.g., "gemini")
         - MODEL_N_OPENROUTER: OpenRouter model ID
         - MODEL_N_OLLAMA: Ollama model ID
+        - MODEL_N_MAX_CONTEXT: Maximum context tokens (optional, default 32000)
         - MODEL_N_DISPLAY_NAME: Long display name
         """
         self.models = {}
@@ -175,13 +177,18 @@ class Config:
                 f"MODEL_{model_index}_DISPLAY_NAME",
                 name.upper()  # Default to uppercase name if not specified
             )
+            max_context = int(os.getenv(
+                f"MODEL_{model_index}_MAX_CONTEXT",
+                "32000"  # Default to 32K tokens
+            ))
 
             # Add to models dict
             self.models[name] = ModelConfig(
                 name=name,
                 openrouter_id=openrouter_id,
                 ollama_id=ollama_id,
-                display_name=display_name
+                display_name=display_name,
+                max_context_tokens=max_context
             )
 
             model_index += 1
@@ -197,25 +204,29 @@ class Config:
                 name="gemini",
                 openrouter_id="google/gemini-pro-1.5",
                 ollama_id="gemma:7b",
-                display_name="Google Gemini Pro 1.5"
+                display_name="Google Gemini Pro 1.5",
+                max_context_tokens=32000
             ),
             "kimi": ModelConfig(
                 name="kimi",
                 openrouter_id="moonshot/kimi-chat",
                 ollama_id="qwen:7b",
-                display_name="Moonshot Kimi Chat"
+                display_name="Moonshot Kimi Chat",
+                max_context_tokens=32000
             ),
             "claude": ModelConfig(
                 name="claude",
                 openrouter_id="anthropic/claude-sonnet-4.5",
                 ollama_id="llama3:8b",
-                display_name="Anthropic Claude Sonnet 4.5"
+                display_name="Anthropic Claude Sonnet 4.5",
+                max_context_tokens=200000
             ),
             "chatgpt": ModelConfig(
                 name="chatgpt",
                 openrouter_id="openai/gpt-4-turbo",
                 ollama_id="mistral:7b",
-                display_name="OpenAI GPT-4 Turbo"
+                display_name="OpenAI GPT-4 Turbo",
+                max_context_tokens=128000
             ),
         }
 

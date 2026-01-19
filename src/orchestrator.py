@@ -59,6 +59,7 @@ class ExperimentOrchestrator:
         workflow.add_node("process_block_round1", self._process_block_node)
         workflow.add_node("process_block_round2", self._process_block_round2_node)
         workflow.add_node("process_block_round3", self._process_block_round3_node)
+        workflow.add_node("next_block", self._next_block_node)
         workflow.add_node("complete", self._complete_node)
 
         # Set entry point
@@ -70,26 +71,20 @@ class ExperimentOrchestrator:
             current_block = state["current_block"]
             if self.config.get_max_tokens(current_block, round_num=2) > 0:
                 return "process_block_round2"
-            # Skip to next block or complete
-            if len(state["blocks_to_process"]) > 0:
-                return "process_block_round1"
-            return "complete"
+            # No Round 2 - go to next block check
+            return "next_block"
 
         def should_continue_to_round3(state: ConversationState) -> str:
             """Check if current block needs Round 3."""
             current_block = state["current_block"]
             if self.config.get_max_tokens(current_block, round_num=3) > 0:
                 return "process_block_round3"
-            # Skip to next block or complete
-            if len(state["blocks_to_process"]) > 0:
-                return "process_block_round1"
-            return "complete"
+            # No Round 3 - go to next block check
+            return "next_block"
 
         def should_continue_after_round3(state: ConversationState) -> str:
-            """Check if more blocks to process."""
-            if len(state["blocks_to_process"]) > 0:
-                return "process_block_round1"
-            return "complete"
+            """After Round 3, always check for next block."""
+            return "next_block"
 
         # Connect nodes with conditional logic
         workflow.add_conditional_edges(
@@ -103,6 +98,18 @@ class ExperimentOrchestrator:
         workflow.add_conditional_edges(
             "process_block_round3",
             should_continue_after_round3
+        )
+
+        # next_block node decides whether to continue or complete
+        def should_process_next_block(state: ConversationState) -> str:
+            """Check if there are more blocks to process."""
+            if len(state["blocks_to_process"]) > 0:
+                return "process_block_round1"
+            return "complete"
+
+        workflow.add_conditional_edges(
+            "next_block",
+            should_process_next_block
         )
 
         workflow.add_edge("complete", END)
@@ -149,21 +156,29 @@ class ExperimentOrchestrator:
 
             # Process each question
             for question in block_prompt.questions:
-                # Construct prompt for each model (with question context)
-                question_prompt = self._construct_question_prompt(
-                    state["common_instructions"],
-                    block_prompt,
-                    question
-                )
-
                 # Generate responses from all models in parallel
                 tasks = []
                 for model_name in model_names:
-                    # Create model-specific prompt
-                    model_prompt = question_prompt.replace(
-                        "{MODEL_NAME}",
-                        self.config.models[model_name].display_name
-                    )
+                    # Block C needs special handling - inject A/B context
+                    if current_block == "C":
+                        model_prompt = self._construct_block_c_prompt(
+                            model_name=model_name,
+                            block_prompt=block_prompt,
+                            state=state,
+                            question=question
+                        )
+                    else:
+                        # Construct prompt for each model (with question context)
+                        question_prompt = self._construct_question_prompt(
+                            state["common_instructions"],
+                            block_prompt,
+                            question
+                        )
+                        # Create model-specific prompt
+                        model_prompt = question_prompt.replace(
+                            "{MODEL_NAME}",
+                            self.config.models[model_name].display_name
+                        )
 
                     # Create async task
                     task_coro = self._generate_with_tracking(
@@ -556,6 +571,170 @@ class ExperimentOrchestrator:
         content = content.replace("{MODEL_NAME}", model_name)
 
         return content
+
+    def _construct_block_c_prompt(
+        self,
+        model_name: str,
+        block_prompt: BlockPrompt,
+        state: ConversationState,
+        question
+    ) -> str:
+        """
+        Construct prompt for Block C with full context from Blocks A and B.
+
+        Block C is a synthesis block that requires models to reflect on all
+        previous responses from the experiment.
+
+        Args:
+            model_name: Name of the model
+            block_prompt: Parsed Block C prompt
+            state: Current conversation state with all previous responses
+            question: Current question to answer
+
+        Returns:
+            Complete prompt string with A/B context injected
+        """
+        # Get model's context limit
+        model_config = self.config.models.get(model_name)
+        max_context = model_config.max_context_tokens if model_config else 32000
+        max_output = block_prompt.max_tokens
+        
+        # Reserve tokens: 30% for base prompt, rest for context
+        available_for_context = int((max_context - max_output) * 0.7)
+        
+        # Log context limits for transparency
+        self.telemetry.print_info(
+            f"Block C for {model_name}: context limit={max_context:,} tokens, "
+            f"available for A/B context={available_for_context:,} tokens"
+        )
+        
+        parts = []
+
+        # Add common instructions
+        parts.append(state["common_instructions"].raw_content)
+        parts.append("\n\n---\n\n")
+
+        # Add block context
+        parts.append(f"# Block C - Round 1: Final Synthesis\n\n")
+
+        if block_prompt.experiment_organization:
+            parts.append("**Experiment Organization:**\n")
+            parts.append(block_prompt.experiment_organization)
+            parts.append("\n\n")
+
+        # Build compressed context from Blocks A and B
+        context_parts = self._build_compressed_context(
+            state=state,
+            max_tokens=available_for_context,
+            model_name=model_name
+        )
+        parts.extend(context_parts)
+
+        parts.append("---\n\n")
+
+        # Add parameters
+        parts.append(f"**Parameters:**\n")
+        parts.append(f"- Maximum {block_prompt.max_tokens} tokens in response.\n\n")
+
+        # Add response format
+        if block_prompt.response_format:
+            parts.append("**Response Format:**\n```\n")
+            parts.append(block_prompt.response_format)
+            parts.append("\n```\n\n")
+
+        # Add question
+        parts.append(f"## Question {question.number} - {question.title}\n\n")
+        parts.append(question.text)
+        parts.append("\n\n---\n\n")
+        parts.append("Please provide your response now.\n")
+
+        # Build final prompt
+        prompt = "".join(parts)
+
+        # Replace model name placeholders
+        prompt = prompt.replace("[YOUR_NAME]", model_name)
+        prompt = prompt.replace("{MODEL_NAME}", self.config.models[model_name].display_name)
+
+        return prompt
+
+    def _build_compressed_context(
+        self,
+        state: ConversationState,
+        max_tokens: int,
+        model_name: str
+    ) -> List[str]:
+        """
+        Build compressed context from previous blocks, respecting token limits.
+        
+        Args:
+            state: Current conversation state
+            max_tokens: Maximum tokens allowed for context
+            model_name: Name of current model (for filtering own responses)
+            
+        Returns:
+            List of context strings to include in prompt
+        """
+        parts = []
+        
+        parts.append("## Previous Experiment Context\n\n")
+        parts.append("You have participated in Blocks A and B. Below is a summary of key responses:\n\n")
+        
+        # Estimate ~4 chars per token for rough sizing
+        CHARS_PER_TOKEN = 4
+        available_chars = max_tokens * CHARS_PER_TOKEN
+        used_chars = sum(len(p) for p in parts)
+        
+        # Collect all responses from A and B
+        all_responses = []
+        for block_name in ["A", "B"]:
+            block_responses = state["model_responses"].get(block_name, [])
+            for resp in block_responses:
+                all_responses.append((block_name, resp))
+        
+        # Strategy: Include first part of each response, compress more if needed
+        chars_per_response = (available_chars - used_chars) // max(len(all_responses), 1)
+        chars_per_response = max(200, min(chars_per_response, 600))  # Between 200-600 chars
+        
+        current_block = None
+        for block_name, resp in all_responses:
+            # Add block header if changed
+            if block_name != current_block:
+                parts.append(f"\n### Block {block_name}\n\n")
+                current_block = block_name
+            
+            # Add compressed response
+            round_label = f"R{resp.round}"
+            q_label = f"Q{resp.question_num}" if resp.question_num else ""
+            parts.append(f"**{resp.model_name} ({round_label}{q_label}):** ")
+            
+            # Compress content
+            content = resp.content.strip()
+            if len(content) > chars_per_response:
+                # Take beginning and add ellipsis
+                content = content[:chars_per_response] + "..."
+            
+            parts.append(content)
+            parts.append("\n\n")
+        
+        return parts
+
+    async def _next_block_node(self, state: ConversationState) -> ConversationState:
+        """
+        Transition node - moves to next block in sequence.
+        
+        Args:
+            state: Current state
+            
+        Returns:
+            Updated state with next block set as current
+        """
+        if state["blocks_to_process"]:
+            # Pop next block from queue
+            next_block = state["blocks_to_process"].pop(0)
+            state["current_block"] = next_block
+            self.telemetry.print_info(f"Advancing to Block {next_block}")
+        
+        return state
 
     async def _complete_node(self, state: ConversationState) -> ConversationState:
         """

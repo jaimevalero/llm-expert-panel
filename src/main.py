@@ -109,43 +109,55 @@ async def run_experiment_async(
         # Generate output files for each block
         telemetry.print_info("Generating output files...")
 
+        files_generated = 0
         for block in blocks:
-            if block not in all_responses:
-                telemetry.print_error(f"No responses for Block {block}")
+            if block not in all_responses or not all_responses[block]:
+                telemetry.print_error(f"No responses for Block {block} - skipping file generation")
                 continue
 
-            # Parse block to get questions
-            block_prompt = parser.parse_block_prompt(block, round_num=1)
+            try:
+                # Parse block to get questions
+                block_prompt = parser.parse_block_prompt(block, round_num=1)
 
-            # Generate markdown
-            content = markdown_gen.generate_block_output(
-                block=block,
-                questions=block_prompt.questions,
-                responses=all_responses[block],
-                config=config
-            )
+                # Generate markdown
+                content = markdown_gen.generate_block_output(
+                    block=block,
+                    questions=block_prompt.questions,
+                    responses=all_responses[block],
+                    config=config
+                )
 
-            # Determine language
-            language = "es" if block == "D" else "en"
+                # Determine language
+                language = "es" if block == "D" else "en"
 
-            # Write file
-            output_path = markdown_gen.write_output_file(
-                block=block,
-                content=content,
-                language=language
-            )
+                # Write file
+                output_path = markdown_gen.write_output_file(
+                    block=block,
+                    content=content,
+                    language=language
+                )
 
-            telemetry.print_success(f"Generated: {output_path}")
+                telemetry.print_success(f"Generated: {output_path}")
+                files_generated += 1
+            except Exception as e:
+                telemetry.print_error(f"Failed to generate output for Block {block}: {e}")
 
-        # Generate summary report
-        summary_content = markdown_gen.generate_summary_report(all_responses, config)
-        summary_path = markdown_gen.write_summary_report(summary_content)
-        telemetry.print_success(f"Generated: {summary_path}")
+        # Report generation summary
+        if files_generated > 0:
+            telemetry.print_info(f"Successfully generated {files_generated}/{len(blocks)} block output files")
+        else:
+            telemetry.print_error("No output files were generated")
+
+        # Generate summary report (even if some blocks failed)
+        if all_responses:
+            summary_content = markdown_gen.generate_summary_report(all_responses, config)
+            summary_path = markdown_gen.write_summary_report(summary_content)
+            telemetry.print_success(f"Generated: {summary_path}")
 
         # Show telemetry report
         telemetry.generate_report()
 
-        return True
+        return files_generated > 0
 
     except Exception as e:
         telemetry.print_error(f"Experiment failed: {str(e)}")
