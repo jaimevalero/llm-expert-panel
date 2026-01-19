@@ -54,26 +54,42 @@ This repository hosts a series of structured experiments designed to explore phe
 
 ## Current Status
 
-### Completed ✓
+### Completed ✓ (Phase 1: MVP - Round 1 Only)
 
 - [X] Experiment 3 structure defined
 - [X] Manual execution with 4 models (Gemini, Kimi, Claude, ChatGPT)
 - [X] Results documented in Blocks A, B, C, and D
 - [X] Executive summary generated
+- [X] **Automation Pipeline Implemented** (January 2026)
+  - [X] Project structure and configuration management
+  - [X] Conda environment integration (Python 3.10)
+  - [X] LangChain/LangGraph orchestration
+  - [X] OpenRouter API integration
+  - [X] Ollama local model support
+  - [X] LangSmith telemetry and tracing
+  - [X] Rich CLI output with progress bars
+  - [X] Markdown prompt parser
+  - [X] Markdown output generator
+  - [X] Token tracking and cost estimation
+  - [X] Error handling and retries
+  - [X] Summary report generation
+  - [X] Complete documentation (README.md)
 
 ### In Progress 🔄
 
-- [ ] Standardizing file structure
-- [ ] Documenting experiment methodology
+- [ ] Testing with OpenRouter (production)
+- [ ] Testing with Ollama (local development)
+- [ ] Validation of output format vs manual results
 
-### Planned 📋
+### Planned 📋 (Phase 2: Full Implementation)
 
-- [ ] Automation script development
-- [ ] Template extraction system
-- [ ] Token calculator utility
-- [ ] OpenRouter integration
-- [ ] Multi-experiment runner
-- [ ] Results analyzer and comparator
+- [ ] Round 2 support (cross-model comments and questions)
+- [ ] Round 3 support (targeted responses)
+- [ ] Multi-round conversation state persistence
+- [ ] Web UI (Streamlit dashboard)
+- [ ] Automated result analysis and comparison
+- [ ] A/B testing with different model combinations
+- [ ] Multiple output formats (PDF, JSON, YAML)
 
 ## Technical Considerations
 
@@ -120,26 +136,88 @@ parsing-llm/
 └── Claude.md (this file) # Project roadmap and TODO
 ```
 
+## Using the Automation Pipeline
+
+### Quick Start
+
+```bash
+# 1. Activate conda environment
+conda activate parsing-llm
+
+# 2. Install dependencies (if not already done)
+pip install -r requirements.txt
+
+# 3. Configure .env
+cp .env.example .env
+# Edit .env with your API keys
+
+# 4. Run experiment
+python src/main.py
+
+# 5. View results
+ls output/
+```
+
+### Common Commands
+
+```bash
+# Estimate token usage before running
+python src/main.py --estimate-only
+
+# Run single block
+python src/main.py --block A
+
+# Run with Ollama (local, free)
+python src/main.py --provider ollama
+
+# Run with OpenRouter (production)
+python src/main.py --provider openrouter
+```
+
+### Output Files
+
+Generated files in `output/` directory:
+
+- `Block_A_Questions_Answers.md` - Block A responses
+- `Block_B_Questions_Answers.md` - Block B responses
+- `Block_C_Questions_Answers.md` - Block C responses
+- `Block_D_Preguntas_Contestadas.md` - Block D responses (Spanish)
+- `SUMMARY_REPORT.md` - Aggregated statistics
+
 ## Next Steps
 
-1. **Phase 1: Structure**
+### Phase 2: Round 2/3 Support
 
-   - Complete documentation of Experiment 3
-   - Create template structure for future experiments
-2. **Phase 2: Extraction**
+1. **Round 2 Implementation**
+   - Extend parser to extract Round 2 prompts
+   - Add orchestrator node for cross-model comments
+   - Update output generator for comment formatting
 
-   - Build question/prompt extraction system
-   - Create configuration schema for experiments
-3. **Phase 3: Automation**
+2. **Round 3 Implementation**
+   - Parse targeted questions from Round 2
+   - Add routing logic for directed responses
+   - Update state management for multi-round flow
 
-   - Implement LangGraph orchestration
-   - Integrate OpenRouter API
-   - Add token tracking and cost estimation
-4. **Phase 4: Analysis**
+3. **Testing**
+   - Validate Round 2/3 output format
+   - Compare with manual multi-round results
 
-   - Develop result aggregation tools
-   - Create comparison visualizations
-   - Build analysis pipelines
+### Phase 3: Advanced Features
+
+1. **Web UI** (Streamlit)
+   - Dashboard for experiment execution
+   - Real-time progress visualization
+   - Interactive result exploration
+
+2. **Result Analysis**
+   - Automated response comparison
+   - Sentiment analysis
+   - Consensus/disagreement detection
+
+3. **Extended Capabilities**
+   - Multiple output formats (PDF, JSON, YAML)
+   - A/B testing framework
+   - Cost optimization strategies
 
 ## Contributing
 
