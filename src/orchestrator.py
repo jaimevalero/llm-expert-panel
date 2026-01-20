@@ -18,6 +18,7 @@ class ConversationState(TypedDict):
     """State for experiment execution."""
     current_block: str
     blocks_to_process: List[str]
+    blocks_completed: List[str]  # Track which blocks are done
     round: int
     common_instructions: CommonInstructions
     block_prompt: Optional[BlockPrompt]
@@ -71,7 +72,10 @@ class ExperimentOrchestrator:
             current_block = state["current_block"]
             if self.config.get_max_tokens(current_block, round_num=2) > 0:
                 return "process_block_round2"
-            # No Round 2 - go to next block check
+            # No Round 2 - check if Round 3 exists
+            if self.config.get_max_tokens(current_block, round_num=3) > 0:
+                return "process_block_round3"
+            # No more rounds - go to next block
             return "next_block"
 
         def should_continue_to_round3(state: ConversationState) -> str:
@@ -79,7 +83,7 @@ class ExperimentOrchestrator:
             current_block = state["current_block"]
             if self.config.get_max_tokens(current_block, round_num=3) > 0:
                 return "process_block_round3"
-            # No Round 3 - go to next block check
+            # No Round 3 - go to next block
             return "next_block"
 
         def should_continue_after_round3(state: ConversationState) -> str:
@@ -102,10 +106,16 @@ class ExperimentOrchestrator:
 
         # next_block node decides whether to continue or complete
         def should_process_next_block(state: ConversationState) -> str:
-            """Check if there are more blocks to process."""
-            if len(state["blocks_to_process"]) > 0:
-                return "process_block_round1"
-            return "complete"
+            """Check if current_block needs to be processed."""
+            current = state["current_block"]
+            completed = state["blocks_completed"]
+            
+            # If current block was already completed, we're done
+            if current in completed:
+                return "complete"
+            
+            # Otherwise, process it
+            return "process_block_round1"
 
         workflow.add_conditional_edges(
             "next_block",
@@ -353,12 +363,7 @@ class ExperimentOrchestrator:
                 state["errors"].append(error_msg)
                 self.telemetry.print_error(error_msg)
 
-        # Move to next block after Round 3
-        blocks_remaining = state["blocks_to_process"]
-        if blocks_remaining:
-            next_block = blocks_remaining.pop(0)
-            state["current_block"] = next_block
-
+        # NOTE: Block transition is handled by next_block node, not here
         return state
 
     async def _generate_with_tracking(
@@ -722,18 +727,31 @@ class ExperimentOrchestrator:
         """
         Transition node - moves to next block in sequence.
         
+        This node is called AFTER all rounds of a block are complete.
+        It marks the just-finished block as completed and advances to the next.
+        
         Args:
             state: Current state
             
         Returns:
             Updated state with next block set as current
         """
-        if state["blocks_to_process"]:
-            # Pop next block from queue
-            next_block = state["blocks_to_process"].pop(0)
+        just_finished = state["current_block"]
+        remaining = state["blocks_to_process"]
+
+        # Mark the block we just finished as completed
+        if just_finished not in state["blocks_completed"]:
+            state["blocks_completed"].append(just_finished)
+            self.telemetry.print_info(f"✓ Completed Block {just_finished}")
+
+        if remaining:
+            # Pop next block from queue and set as current
+            next_block = remaining.pop(0)
             state["current_block"] = next_block
-            self.telemetry.print_info(f"Advancing to Block {next_block}")
-        
+            self.telemetry.print_info(f"→ Advancing to Block {next_block}. Remaining: {remaining}")
+        else:
+            self.telemetry.print_info(f"→ No more blocks to process after Block {just_finished}")
+
         return state
 
     async def _complete_node(self, state: ConversationState) -> ConversationState:
@@ -785,7 +803,8 @@ class ExperimentOrchestrator:
         # Initialize state
         initial_state: ConversationState = {
             "current_block": blocks[0],
-            "blocks_to_process": blocks[1:].copy(),  # Remaining blocks
+            "blocks_to_process": list(blocks[1:]),  # Remaining blocks (explicit list())
+            "blocks_completed": [],  # Track completed blocks
             "round": 1,
             "common_instructions": common_instructions,
             "block_prompt": None,
@@ -796,6 +815,12 @@ class ExperimentOrchestrator:
             "round3_routing": {},
             "errors": []
         }
+        
+        # Debug: Log initial state
+        self.telemetry.print_info(
+            f"Initial state: current_block={initial_state['current_block']}, "
+            f"blocks_to_process={initial_state['blocks_to_process']}"
+        )
 
         # Start telemetry
         self.telemetry.start_experiment(

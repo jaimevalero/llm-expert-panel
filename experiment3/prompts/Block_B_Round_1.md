@@ -7,7 +7,7 @@ Refer to [common_instructions.md](common_instructions.md) for shared participati
 **Experiment Organization:**
 
 Block B:
-├── Round 1: Thematic questions (4)
+├── Round 1: Thematic questions (4) ← **YOU ARE HERE**
 │   └── Independent response from each model
 ├── Round 2: Read all previous responses
 │   ├── Each model chooses ONE point from another model to comment on
@@ -17,9 +17,11 @@ Block B:
 You are in (Block B, Round 1)
 
 **Parameters**
+
 - Maximum 1400 tokens in response.
 
 **Response Format:**
+
 ```
 [YOUR_NAME] (Block B, Round 1, Question 1): [Your response here]
 [YOUR_NAME] (Block B, Round 1, Question 2): [Your response here]
