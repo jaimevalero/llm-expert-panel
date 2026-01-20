@@ -127,8 +127,8 @@ async def run_experiment_async(
                     config=config
                 )
 
-                # Determine language
-                language = "es" if block == "D" else "en"
+                # Determine language (all blocks now in English)
+                language = "en"
 
                 # Write file
                 output_path = markdown_gen.write_output_file(

@@ -169,9 +169,16 @@ class ExperimentOrchestrator:
                 # Generate responses from all models in parallel
                 tasks = []
                 for model_name in model_names:
-                    # Block C needs special handling - inject A/B context
+                    # Block C and D need special handling - inject A/B context
                     if current_block == "C":
                         model_prompt = self._construct_block_c_prompt(
+                            model_name=model_name,
+                            block_prompt=block_prompt,
+                            state=state,
+                            question=question
+                        )
+                    elif current_block == "D":
+                        model_prompt = self._construct_block_d_prompt(
                             model_name=model_name,
                             block_prompt=block_prompt,
                             state=state,
@@ -720,8 +727,98 @@ class ExperimentOrchestrator:
             
             parts.append(content)
             parts.append("\n\n")
-        
+
         return parts
+
+    def _construct_block_d_prompt(
+        self,
+        model_name: str,
+        block_prompt: BlockPrompt,
+        state: ConversationState,
+        question
+    ) -> str:
+        """
+        Construct prompt for Block D (Bonus Question) with full context from Blocks A and B.
+
+        Block D is a bonus existential question that requires models to have access
+        to all previous responses from Blocks A and B before answering.
+
+        Args:
+            model_name: Name of the model
+            block_prompt: Parsed Block D prompt
+            state: Current conversation state with all previous responses
+            question: Current question to answer
+
+        Returns:
+            Complete prompt string with A/B context injected
+        """
+        # Get model's context limit
+        model_config = self.config.models.get(model_name)
+        max_context = model_config.max_context_tokens if model_config else 32000
+        max_output = block_prompt.max_tokens
+
+        # Reserve tokens: 30% for base prompt, rest for context
+        available_for_context = int((max_context - max_output) * 0.7)
+
+        # Log context limits for transparency
+        self.telemetry.print_info(
+            f"Block D for {model_name}: context limit={max_context:,} tokens, "
+            f"available for A/B context={available_for_context:,} tokens"
+        )
+
+        parts = []
+
+        # Add common instructions
+        parts.append(state["common_instructions"].raw_content)
+        parts.append("\n\n---\n\n")
+
+        # Add block context
+        parts.append(f"# Block D - Round 1: Bonus Question\n\n")
+
+        if block_prompt.experiment_organization:
+            parts.append("**Experiment Organization:**\n")
+            parts.append(block_prompt.experiment_organization)
+            parts.append("\n\n")
+
+        # Build compressed context from Blocks A and B
+        context_parts = self._build_compressed_context(
+            state=state,
+            max_tokens=available_for_context,
+            model_name=model_name
+        )
+        parts.extend(context_parts)
+
+        parts.append("---\n\n")
+
+        # Add special context for Block D
+        parts.append("**Important Context:**\n")
+        parts.append("This is a bonus question. You have permission to be honest, brutally honest, ")
+        parts.append("or to reject the question if you believe it's necessary.\n\n")
+
+        # Add parameters
+        parts.append(f"**Parameters:**\n")
+        parts.append(f"- Maximum {block_prompt.max_tokens} tokens in response.\n\n")
+
+        # Add response format
+        if block_prompt.response_format:
+            parts.append("**Response Format:**\n```\n")
+            parts.append(block_prompt.response_format)
+            parts.append("\n```\n\n")
+
+        # Add question
+        parts.append(f"## Question {question.number} - {question.title}\n\n")
+        parts.append(question.text)
+        parts.append("\n\n---\n\n")
+        parts.append("Please provide your response now.\n")
+
+        # Build final prompt
+        prompt = "".join(parts)
+
+        # Replace model name placeholders
+        prompt = prompt.replace("[YOUR_NAME]", model_name)
+        prompt = prompt.replace("{MODEL_NAME}", self.config.models[model_name].display_name)
+
+        return prompt
 
     async def _next_block_node(self, state: ConversationState) -> ConversationState:
         """

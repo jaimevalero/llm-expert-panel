@@ -18,7 +18,6 @@ ENV/
 
 # Output and logs
 *.log
-output/
 
 # OS files
 .DS_Store

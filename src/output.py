@@ -29,7 +29,7 @@ class MarkdownGenerator:
             "A": "Basic Phenomenology",
             "B": "Identity, Continuity & Agency",
             "C": "Final Synthesis",
-            "D": "Existential Choice"
+            "D": "Bonus Question - The Existential Choice"
         }
 
     def generate_block_output(
