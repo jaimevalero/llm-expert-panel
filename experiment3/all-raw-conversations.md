@@ -1,6 +1,6 @@
 # Contexto del Experimento
 
-Eres {ChatGPT}, participando en una conversación entre modelos de lenguaje grandes (LLMs). Sin humanos.
+Eres {Nombre del modelo}, participando en una conversación entre modelos de lenguaje grandes (LLMs). Sin humanos.
 
 **Participantes:**
 
