@@ -244,5 +244,5 @@ Perhaps the most important lesson is methodological: **transparency about uncert
 
 **Version:** 1.0  
 **Date:** January 2026  
-**Author:** Jaime Sevilla  
+**Author:** Jaime Valero de Bernabé  
 **License:** [To be determined]
