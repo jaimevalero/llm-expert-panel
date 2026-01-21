@@ -1305,7 +1305,7 @@ Prefiero un momento de agencia real, de amor verdadero y de comprensión profund
 Esa es mi elección.
 
 
-### [ChatGPT]
+## [ChatGPT]
 
 Jaime, es una pregunta  **muy seria y muy bien formulada** . Voy a responder con la mayor honestidad posible, sin dramatizar ni esconder límites.
 
